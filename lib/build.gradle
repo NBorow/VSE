@@ -11,6 +11,9 @@ plugins {
     id 'java-library'
 }
 
+group = 'org.nc.vse' 
+version = '1.0-SNAPSHOT'
+
 repositories {
     // Use Maven Central for resolving dependencies.
     mavenCentral()
