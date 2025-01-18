@@ -46,17 +46,23 @@ public class MultiChannelEngine {
     /**
      * Remove a channel entirely, stopping all songs in it.
      */
+    private void checkAndStopUpdateTask() {
+        if (channels.isEmpty() && updateTask != null) {
+            updateTask.cancel();
+            updateTask = null;
+        }
+    }
+    
     public void removeChannel(String channelName) {
         Channel ch = channels.remove(channelName);
         if (ch != null) {
-            // Not strictly necessary: the next tick loop won't call it
-            // but if you want to forcibly stop everything:
             for (Player p : ch.getPlayers()) {
-                // No direct "stop" needed for players. 
-                // But we can clear the songs if we want.
+                ch.removePlayer(p);
             }
         }
+        checkAndStopUpdateTask();
     }
+    
 
 
     public void addPlayerToChannel(String channelName, Player p) {
@@ -72,12 +78,19 @@ public class MultiChannelEngine {
     }
 
     public void removePlayerFromAllChannels(Player player) {
-        for (Channel channel : channels.values()) {
+        Iterator<Map.Entry<String, Channel>> it = channels.entrySet().iterator();
+        while (it.hasNext()) {
+            Channel channel = it.next().getValue();
             if (channel.getPlayers().contains(player)) {
                 channel.removePlayer(player);
             }
+            // Remove the channel if it has no players left
+            if (channel.getPlayers().isEmpty()) {
+                it.remove();
+            }
         }
     }
+    
 
     /**
      * Start a new song or loop in the given channel.
