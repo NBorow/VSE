@@ -1,25 +1,39 @@
+// Example ActiveSong
 package org.nc.VSE;
 
+import org.bukkit.SoundCategory;
+import org.bukkit.entity.Player;
+
+import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Represents a currently playing instance of a Song.
- * It tracks:
- *  - a unique songId (e.g. "rouletteSpinLoop")
- *  - whether it loops
- *  - the current tick
- *  - whether it’s stopped
- * 
- * It does NOT store players, because that’s handled by the channel.
- */
 public class ActiveSong {
-
-    private final String songId;   // e.g. "rouletteSpinLoop"
+    private final String songId;
     private final Song song;
     private final boolean looping;
 
-    private int currentTick;       // where we are in the timeline
-    private boolean stopped;       // if manually stopped or completed (for non-loop)
+    private int currentTick;
+    private boolean stopped;
+
+    /**
+     * For each Note in the Song, we keep track of:
+     *  - the original Note
+     *  - whether it is currently "active" (we played it but haven't ended it yet)
+     *  - which SoundCategory we actually used to play it
+     */
+    private static class NotePlayback {
+        final Note note;
+        boolean isPlaying;
+        SoundCategory categoryUsed; // <- what category we ended up using
+
+        NotePlayback(Note n) {
+            this.note = n;
+            this.isPlaying = false;
+            this.categoryUsed = n.getCategory(); // default to note's own category
+        }
+    }
+
+    private final List<NotePlayback> notePlaybacks;
 
     public ActiveSong(String songId, Song song, boolean looping) {
         this.songId = songId;
@@ -27,6 +41,11 @@ public class ActiveSong {
         this.looping = looping;
         this.currentTick = 0;
         this.stopped = false;
+
+        this.notePlaybacks = new ArrayList<>();
+        for (Note n : song.getNotes()) {
+            notePlaybacks.add(new NotePlayback(n));
+        }
     }
 
     public String getSongId() {
@@ -45,60 +64,151 @@ public class ActiveSong {
         return stopped;
     }
 
-    /**
-     * Mark as stopped externally, so channel knows to remove it next tick.
-     */
     public void stop() {
         this.stopped = true;
     }
 
+    public void stopAllActiveNotesForSinglePlayer(Player player) {
+        // We do NOT mark np.isPlaying = false,
+        // since the note should keep playing for other players.
+        for (NotePlayback np : notePlaybacks) {
+            if (np.isPlaying) {
+                player.stopSound(np.note.getInstrument(), np.categoryUsed);
+            }
+        }
+    }
+    
+
     /**
-     * Called each tick by the Channel. We pass in the list of players in that channel,
-     * so we can play notes to them.
-     *
-     * @return true if we’re still playing, false if we just finished (for one-shots).
+     * Called each tick by the Channel.
+     *  1) If currentTick == startTick => play the note
+     *  2) If isPlaying && currentTick == endTick => stop the note
+     *  3) If forced stop => stop them all immediately.
      */
-    public boolean tick(List<Note> notes, List<org.bukkit.entity.Player> channelPlayers) {
+    public boolean tick(List<Player> channelPlayers) {
         if (stopped) {
+            // We were forcibly stopped => stop all active notes right away
+            stopAllActiveNotes(channelPlayers);
             return false;
         }
 
-        // 1) Play any notes matching currentTick for the channel’s players
-        for (Note note : notes) {
-            if (note.getStartTick() == currentTick) {
-                for (org.bukkit.entity.Player p : channelPlayers) {
-                    p.playSound(
-                        p.getLocation(),
-                        note.getInstrument(),
-                        note.getVolume(),
-                        note.getPitch()
-                    );
+        for (NotePlayback np : notePlaybacks) {
+            Note note = np.note;
+
+            // (1) Start the note
+            if (!np.isPlaying && currentTick == note.getStartTick()) {
+                // Decide which category to use
+                SoundCategory catToUse = pickCategoryFor(note.getInstrument(), note.getCategory());
+
+                // Actually playSound in that category
+                for (Player p : channelPlayers) {
+                    p.playSound(p.getLocation(), note.getInstrument(), catToUse, note.getVolume(), note.getPitch());
+                }
+
+                // Mark active if it’s a multi-tick note
+                if (note.getEndTick() > note.getStartTick()) {
+                    np.isPlaying = true;
+                    np.categoryUsed = catToUse; // store which category we actually used
                 }
             }
-        }
 
-        // 2) Increment
-        currentTick++;
-
-        // 3) Check if we are past the final note’s end
-        int maxTick = getMaxEndTick(notes);
-        if (currentTick > maxTick) {
-            if (looping) {
-                currentTick = 0; // wrap around
-                return true;     // keep playing
-            } else {
-                stopped = true;
-                return false;    // done playing
+            // (2) End the note
+            if (np.isPlaying && currentTick >= note.getEndTick()&&note.getEndTick()!=note.getStartTick()) {
+                // Stop it in the exact category we used
+                for (Player p : channelPlayers) {
+                    p.stopSound(note.getInstrument(), np.categoryUsed);
+                }
+                np.isPlaying = false;
             }
         }
-        return true; // still going
+
+        // (3) increment tick
+        currentTick++;
+
+        // (4) check if we’re past the final note
+        int maxTick = getMaxEndTick();
+        if (currentTick > maxTick) {
+            if (looping) {
+                // reset to start
+                currentTick = 0;
+                resetAllNotes(channelPlayers);
+                return true;  
+            } else {
+                // done with the song
+                stopAllActiveNotes(channelPlayers);
+                stopped = true;
+                return false;
+            }
+        }
+        return true;
     }
 
-    private int getMaxEndTick(List<Note> notes) {
+    /**
+     * If you want "mostly MASTER" but to override the category if something
+     * with the same instrument is already playing in MASTER, we do that logic here.
+     */
+    private SoundCategory pickCategoryFor(org.bukkit.Sound instr, SoundCategory defaultCat) {
+        // 1) If defaultCat is not MASTER, just respect that
+        if (defaultCat != SoundCategory.MASTER) {
+            return defaultCat;
+        }
+
+        // 2) Otherwise, check if we have the same instrument *currently playing* in MASTER
+        if (isInstrumentActiveInMaster(instr)) {
+            // If yes, pick some fallback category. Let's pick MUSIC, for example.
+            return SoundCategory.MUSIC;
+        }
+
+        // 3) If not active, we stay in MASTER
+        return SoundCategory.MASTER;
+    }
+
+    /**
+     * Checks whether we have a note still "playing" (not ended) in MASTER with the same Sound
+     */
+    private boolean isInstrumentActiveInMaster(org.bukkit.Sound instr) {
+        for (NotePlayback np : notePlaybacks) {
+            if (np.isPlaying
+                && np.categoryUsed == SoundCategory.MASTER
+                && np.note.getInstrument() == instr) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Get the highest endTick in the song so we know when it’s done
+     */
+    private int getMaxEndTick() {
         int max = 0;
-        for (Note note : notes) {
-            max = Math.max(max, note.getEndTick());
+        for (NotePlayback np : notePlaybacks) {
+            max = Math.max(max, np.note.getEndTick());
         }
         return max;
+    }
+
+    /**
+     * Called if the song forcibly stops or finishes. 
+     * Stop every note that is currently playing.
+     */
+    private void stopAllActiveNotes(List<Player> channelPlayers) {
+        for (NotePlayback np : notePlaybacks) {
+            if (np.isPlaying) {
+                for (Player p : channelPlayers) {
+                    p.stopSound(np.note.getInstrument(), np.categoryUsed);
+                }
+                np.isPlaying = false;
+            }
+        }
+    }
+
+    /**
+     * If we loop, we want to re-activate from the start, 
+     * so we also stop any note that might still be playing.
+     */
+    private void resetAllNotes(List<Player> channelPlayers) {
+        stopAllActiveNotes(channelPlayers);
+        // currentTick reset done in the main logic
     }
 }
