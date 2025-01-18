@@ -39,8 +39,11 @@ public class Channel {
      * Remove a player, so they no longer hear songs in this channel.
      */
     public void removePlayer(Player p) {
+        for (ActiveSong as : activeSongs.values()) {
+            as.stopAllActiveNotesForSinglePlayer(p);}
         players.remove(p);
     }
+
 
     public Set<Player> getPlayers() {
         return players;
@@ -81,23 +84,24 @@ public class Channel {
      * Called each tick by MultiSongEngine to update this channel’s songs.
      */
     public void tick() {
-        List<String> toRemove = new ArrayList<>();
-        // Update each ActiveSong
-        for (ActiveSong as : activeSongs.values()) {
+        Iterator<Map.Entry<String, ActiveSong>> it = activeSongs.entrySet().iterator();
+    
+        while (it.hasNext()) {
+            Map.Entry<String, ActiveSong> entry = it.next();
+            ActiveSong as = entry.getValue();
+    
             if (!as.isStopped()) {
-                // tick the underlying note list
-                boolean stillPlaying = as.tick(as.getSong().getNotes(), new ArrayList<>(players));
+                // Tick the song and check if it's still playing
+                boolean stillPlaying = as.tick(new ArrayList<>(players));
+    
                 if (!stillPlaying) {
-                    // means song ended or was stopped
-                    toRemove.add(as.getSongId());
+                    it.remove(); // Remove finished song immediately
                 }
             } else {
-                toRemove.add(as.getSongId());
+                it.remove(); // Remove stopped song
             }
         }
-        // remove finished songs
-        for (String id : toRemove) {
-            activeSongs.remove(id);
-        }
     }
+    
+    
 }
