@@ -1,5 +1,6 @@
 package org.nc.VSE;
 
+import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 
 import java.util.*;
@@ -13,6 +14,7 @@ import java.util.*;
  * The channel's tick() updates all songs, playing notes to its players.
  */
 public class Channel {
+    private final Set<Sound> allPlayedSounds = new HashSet<>();
 
     private final String channelName;
     private final Set<Player> players;           // All players in this channel
@@ -39,11 +41,16 @@ public class Channel {
      * Remove a player, so they no longer hear songs in this channel.
      */
     public void removePlayer(Player p) {
+        if (!players.contains(p)) return; 
         for (ActiveSong as : activeSongs.values()) {
             as.stopAllActiveNotesForSinglePlayer(p);}
         players.remove(p);
     }
 
+    public Set<Sound> getAllPlayedSounds() {
+        return allPlayedSounds;
+    }
+    
 
     public Set<Player> getPlayers() {
         return players;
@@ -65,6 +72,10 @@ public class Channel {
             activeSongs.remove(songId);
         }
 
+        for (Note note : song.getNotes()) {
+            allPlayedSounds.add(note.getInstrument());
+        }
+
         ActiveSong as = new ActiveSong(songId, song, looping);
         activeSongs.put(songId, as);
         return songId;
@@ -83,25 +94,25 @@ public class Channel {
     /**
      * Called each tick by MultiSongEngine to update this channel’s songs.
      */
-    public void tick() {
-        Iterator<Map.Entry<String, ActiveSong>> it = activeSongs.entrySet().iterator();
-    
-        while (it.hasNext()) {
-            Map.Entry<String, ActiveSong> entry = it.next();
-            ActiveSong as = entry.getValue();
-    
-            if (!as.isStopped()) {
-                // Tick the song and check if it's still playing
-                boolean stillPlaying = as.tick(new ArrayList<>(players));
-    
-                if (!stillPlaying) {
-                    it.remove(); // Remove finished song immediately
-                }
-            } else {
-                it.remove(); // Remove stopped song
+  public void tick() {
+    Iterator<Map.Entry<String, ActiveSong>> it = activeSongs.entrySet().iterator();
+
+    while (it.hasNext()) {
+        Map.Entry<String, ActiveSong> entry = it.next();
+        ActiveSong as = entry.getValue();
+
+        if (!as.isStopped()) {
+            // Tick the song and check if it's still playing
+            boolean stillPlaying = as.tick(new ArrayList<>(players));
+
+            if (!stillPlaying) {
+                it.remove(); // Remove finished song immediately
             }
+        } else {
+            it.remove(); // Remove stopped song
         }
     }
-    
+}
+
     
 }

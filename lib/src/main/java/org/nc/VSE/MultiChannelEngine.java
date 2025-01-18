@@ -1,6 +1,8 @@
 package org.nc.VSE;
 
 import org.bukkit.Bukkit;
+import org.bukkit.Sound;
+import org.bukkit.SoundCategory;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.entity.Player;
@@ -82,6 +84,9 @@ public class MultiChannelEngine {
         while (it.hasNext()) {
             Channel channel = it.next().getValue();
             if (channel.getPlayers().contains(player)) {
+                  for (Sound sound : channel.getAllPlayedSounds()) {
+                    player.stopSound(sound, SoundCategory.MASTER);
+                  }    
                 channel.removePlayer(player);
             }
             // Remove the channel if it has no players left
