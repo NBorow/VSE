@@ -59,6 +59,17 @@ public class MultiChannelEngine {
         Channel ch = channels.remove(channelName);
         if (ch != null) {
             for (Player p : ch.getPlayers()) {
+                for (String s : ch.getAllPlayedStrings()) {
+                    if(s!=null){
+                        for (SoundCategory category : SoundCategory.values()) {
+                            p.stopSound(s, category);
+                        }
+                    }
+                  }  
+                  for (Sound sound : ch.getAllPlayedSounds()) {
+                    if(sound!=null){
+                    p.stopSound(sound, SoundCategory.MASTER);}
+                  }    
                 ch.removePlayer(p);
             }
         }
@@ -75,15 +86,36 @@ public class MultiChannelEngine {
     public void removePlayerFromChannel(String channelName, Player p) {
         Channel ch = channels.get(channelName);
         if (ch != null) {
+            if (ch.getPlayers().contains(p)) {
+                for (String s : ch.getAllPlayedStrings()) {
+                    if(s!=null){
+                        for (SoundCategory category : SoundCategory.values()) {
+                            p.stopSound(s, category);
+                        }
+                    }
+                  }  
+                  for (Sound sound : ch.getAllPlayedSounds()) {
+                    if(sound!=null){
+                    p.stopSound(sound, SoundCategory.MASTER);}
+                  }    
             ch.removePlayer(p);
+
+
         }
     }
-
+    }
     public void removePlayerFromAllChannels(Player player) {
         Iterator<Map.Entry<String, Channel>> it = channels.entrySet().iterator();
         while (it.hasNext()) {
             Channel channel = it.next().getValue();
             if (channel.getPlayers().contains(player)) {
+                for (String s : channel.getAllPlayedStrings()) {
+                    if(s!=null){
+                        for (SoundCategory category : SoundCategory.values()) {
+                            player.stopSound(s, category);
+                        }
+                    }
+                  }  
                   for (Sound sound : channel.getAllPlayedSounds()) {
                     if(sound!=null){
                     player.stopSound(sound, SoundCategory.MASTER);}
