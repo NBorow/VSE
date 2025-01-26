@@ -15,10 +15,11 @@ import java.util.*;
  */
 public class Channel {
     private final Set<Sound> allPlayedSounds = new HashSet<>();
-
+    private final Set<String> allPlayedStrings = new HashSet<>();
     private final String channelName;
     private final Set<Player> players;           // All players in this channel
-    private final Map<String, ActiveSong> activeSongs;  // songId -> ActiveSong
+    private final Map<String, ActiveSong> activeSongs;
+      // songId -> ActiveSong
 
     public Channel(String channelName) {
         this.channelName = channelName;
@@ -50,6 +51,10 @@ public class Channel {
     public Set<Sound> getAllPlayedSounds() {
         return allPlayedSounds;
     }
+
+    public Set<String> getAllPlayedStrings() {
+        return allPlayedStrings;
+    }
     
 
     public Set<Player> getPlayers() {
@@ -73,9 +78,11 @@ public class Channel {
         }
 
         for (Note note : song.getNotes()) {
+            if(note.getInstr()!=null){
+                allPlayedStrings.add(note.getInstr());
+            }
             allPlayedSounds.add(note.getInstrument());
         }
-
         ActiveSong as = new ActiveSong(songId, song, looping);
         activeSongs.put(songId, as);
         return songId;
