@@ -85,7 +85,8 @@ public class MultiChannelEngine {
             Channel channel = it.next().getValue();
             if (channel.getPlayers().contains(player)) {
                   for (Sound sound : channel.getAllPlayedSounds()) {
-                    player.stopSound(sound, SoundCategory.MASTER);
+                    if(sound!=null){
+                    player.stopSound(sound, SoundCategory.MASTER);}
                   }    
                 channel.removePlayer(player);
             }
