@@ -1,6 +1,9 @@
 // Example ActiveSong
 package org.nc.VSE;
 
+import org.bukkit.NamespacedKey;
+import org.bukkit.Registry;
+import org.bukkit.Sound;
 import org.bukkit.SoundCategory;
 import org.bukkit.entity.Player;
 
@@ -73,12 +76,19 @@ public class ActiveSong {
         // since the note should keep playing for other players.
         for (NotePlayback np : notePlaybacks) {
             if (np.isPlaying) {
-                player.stopSound(np.note.getInstrument(), np.categoryUsed);
+                     if(np.note.getInstr()!=null){
+                        //player.stopSound(np.note.getInstr(), np.categoryUsed);
+                        player.playSound(player.getLocation(), np.note.getInstr(), 0, np.note.getPitch());
+
+                    }
+                else{
+                    player.stopSound(np.note.getInstrument(), np.categoryUsed);
+
             }
         }
     }
     
-
+    }
     /**
      * Called each tick by the Channel.
      *  1) If currentTick == startTick => play the note
@@ -102,8 +112,14 @@ public class ActiveSong {
 
                 // Actually playSound in that category
                 for (Player p : channelPlayers) {
-                    p.playSound(p.getLocation(), note.getInstrument(), catToUse, note.getVolume(), note.getPitch());
-                }
+                    if(note.getInstr()!=null){    
+                // Sound temp=getSoundSafely(note.getInstr());
+                   //  if(temp!=null){
+                     p.playSound(p.getLocation(), note.getInstr(), note.getVolume(), note.getPitch());
+                    }
+                    else{
+                   p.playSound(p.getLocation(), note.getInstrument(), catToUse, note.getVolume(), note.getPitch());}
+              
 
                 // Mark active if it’s a multi-tick note
                 if (note.getEndTick() > note.getStartTick()) {
@@ -111,12 +127,20 @@ public class ActiveSong {
                     np.categoryUsed = catToUse; // store which category we actually used
                 }
             }
+            }
 
             // (2) End the note
             if (np.isPlaying && currentTick >= note.getEndTick()&&note.getEndTick()!=note.getStartTick()) {
                 // Stop it in the exact category we used
                 for (Player p : channelPlayers) {
+                    if(note.getInstr()!=null){
+                        p.playSound(p.getLocation(), note.getInstr(), 0, note.getPitch());
+
+                        //p.stopSound(note.getInstr(), np.categoryUsed);
+                }else{
                     p.stopSound(note.getInstrument(), np.categoryUsed);
+
+                }
                 }
                 np.isPlaying = false;
             }
@@ -142,7 +166,7 @@ public class ActiveSong {
         }
         return true;
     }
-
+    
     /**
      * If you want "mostly MASTER" but to override the category if something
      * with the same instrument is already playing in MASTER, we do that logic here.
@@ -168,6 +192,10 @@ public class ActiveSong {
      */
     private boolean isInstrumentActiveInMaster(org.bukkit.Sound instr) {
         for (NotePlayback np : notePlaybacks) {
+            if (np.isPlaying
+            && np.note.getInstrument()==null){
+                return false;
+            }
             if (np.isPlaying
                 && np.categoryUsed == SoundCategory.MASTER
                 && np.note.getInstrument() == instr) {
@@ -196,6 +224,10 @@ public class ActiveSong {
         for (NotePlayback np : notePlaybacks) {
             if (np.isPlaying) {
                 for (Player p : channelPlayers) {
+                    if(np.note.getInstr()!=null){
+                        p.playSound(p.getLocation(), np.note.getInstr(), 0, np.note.getPitch());
+                        //p.stopSound(np.note.getInstr(), np.categoryUsed);
+                    }
                     p.stopSound(np.note.getInstrument(), np.categoryUsed);
                 }
                 np.isPlaying = false;
