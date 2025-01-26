@@ -77,8 +77,10 @@ public class ActiveSong {
         for (NotePlayback np : notePlaybacks) {
             if (np.isPlaying) {
                      if(np.note.getInstr()!=null){
+                        for (SoundCategory category : SoundCategory.values()) {
+                            player.stopSound(np.note.getInstr(), category);
+                        }
                         //player.stopSound(np.note.getInstr(), np.categoryUsed);
-                        player.playSound(player.getLocation(), np.note.getInstr(), 0, np.note.getPitch());
 
                     }
                 else{
@@ -134,9 +136,9 @@ public class ActiveSong {
                 // Stop it in the exact category we used
                 for (Player p : channelPlayers) {
                     if(note.getInstr()!=null){
-                        p.playSound(p.getLocation(), note.getInstr(), 0, note.getPitch());
-
-                        //p.stopSound(note.getInstr(), np.categoryUsed);
+                        for (SoundCategory category : SoundCategory.values()) {
+                            p.stopSound(note.getInstr(), category);
+                        }
                 }else{
                     p.stopSound(note.getInstrument(), np.categoryUsed);
 
@@ -166,7 +168,7 @@ public class ActiveSong {
         }
         return true;
     }
-    
+
     /**
      * If you want "mostly MASTER" but to override the category if something
      * with the same instrument is already playing in MASTER, we do that logic here.
@@ -225,7 +227,9 @@ public class ActiveSong {
             if (np.isPlaying) {
                 for (Player p : channelPlayers) {
                     if(np.note.getInstr()!=null){
-                        p.playSound(p.getLocation(), np.note.getInstr(), 0, np.note.getPitch());
+                        for (SoundCategory category : SoundCategory.values()) {
+                            p.stopSound(np.note.getInstr(), category);
+                        }
                         //p.stopSound(np.note.getInstr(), np.categoryUsed);
                     }
                     p.stopSound(np.note.getInstrument(), np.categoryUsed);
